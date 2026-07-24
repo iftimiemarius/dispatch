@@ -61,7 +61,16 @@ func Root() *cobra.Command {
 
 	root.PersistentFlags().StringVar(&dbPathOverride, "db", "", "path to the database file (overrides XDG default)")
 
-	root.AddCommand(newVersionCmd())
+	root.AddCommand(
+		newVersionCmd(),
+		newAddCmd(),
+		newLsCmd(),
+		newTaskCmd(),
+		// Top-level convenience shortcuts for the most common task actions.
+		newTaskDoneCmd(),
+		newTaskRmCmd(),
+		newTaskStartCmd(),
+	)
 	return root
 }
 

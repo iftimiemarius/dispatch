@@ -1,0 +1,69 @@
+# GoReleaser configuration for Dispatch.
+#
+# Docs: https://goreleaser.com
+# Triggered on tag push (v*) by .github/workflows/release.yml.
+# Local full-build test (no publish):  goreleaser release --snapshot --clean
+
+version: 2
+
+project_name: dispatch
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: dispatch
+    main: ./cmd/dispatch
+    binary: dispatch
+    # Embed the released version into the binary (read by `dispatch version`).
+    ldflags:
+      - -s -w -X github.com/iftimiemarius/dispatch/internal/cli.Version={{.Version}}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: default
+    # tar.gz for unix, zip for windows (GoReleaser does this automatically per GOOS).
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    # Ship just the binary; README/LICENSE added for friendliness.
+    files:
+      - README.md
+      - LICENSE*
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-dev"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^chore:"
+      - "^test:"
+      - "Merge pull request"
+      - "Merge branch"
+
+release:
+  github:
+    owner: iftimiemarius
+    name: dispatch
+  draft: false
+  prerelease: auto
+  name_template: "{{ .Tag }}"

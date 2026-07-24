@@ -20,19 +20,55 @@ GitHub integration is **out of scope for v1** and will arrive once the core is m
 
 ## Install
 
+### One-liner (Linux & macOS)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/iftimiemarius/dispatch/main/install.sh | sh
+```
+
+This downloads the latest release for your platform, verifies the SHA-256
+checksum, and installs `dispatch` to `~/.local/bin`. Install somewhere else
+with `DISPATCH_INSTALL_DIR`, or pin a version with `DISPATCH_VERSION`:
+
+```sh
+curl -fsSL .../install.sh | sh -s -- --install-dir ~/bin
+DISPATCH_VERSION=v0.1.0 curl -fsSL .../install.sh | sh
+```
+
+### Windows (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/iftimiemarius/dispatch/main/install.ps1 | iex
+```
+
+Installs `dispatch.exe` to `%LOCALAPPDATA%\dispatch` and adds it to your user
+PATH. (Note: the binary is unsigned, so Windows may show a SmartScreen warning
+on first run — click "More info" → "Run anyway".)
+
+### Update
+
+Once installed, self-update to the latest release:
+
+```sh
+dispatch upgrade          # download and install the latest version
+dispatch upgrade --check  # just report whether an update is available
+```
+
+You can also re-run the install command above to reinstall.
+
+### Build from source
+
 Requires Go 1.23+.
 
 ```sh
 git clone https://github.com/iftimiemarius/dispatch.git
 cd dispatch
-make install        # builds and installs to $GOPATH/bin
+make install                  # builds and installs to $GOPATH/bin
+make build VERSION=0.1.0      # produces ./dispatch
 ```
 
-Or build directly:
-
-```sh
-make build VERSION=0.1.0   # produces ./dispatch
-```
+Releases are cross-compiled and published automatically via GoReleaser when a
+`v*` tag is pushed.
 
 ## Data model
 

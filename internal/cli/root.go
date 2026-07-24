@@ -72,6 +72,7 @@ func Root() *cobra.Command {
 		newCalendarCmd(),
 		newTodayCmd(),
 		newNextCmd(),
+		newUpgradeCmd(),
 		// Top-level convenience shortcuts for the most common task actions.
 		newTaskDoneCmd(),
 		newTaskRmCmd(),

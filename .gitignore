@@ -1,0 +1,21 @@
+# Binaries
+/dispatch
+/bin/
+/dist/
+
+# Test / coverage
+*.out
+*.test
+
+# Go workspace
+go.work
+go.work.sum
+
+# Editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Local dev artifacts
+.zcode/

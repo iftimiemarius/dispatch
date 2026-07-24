@@ -33,9 +33,22 @@ var weekdays = map[string]time.Weekday{
 }
 
 // Parse interprets s as a time relative to ref (typically now). It returns an
-// absolute time in the local zone. Empty input returns the zero time and no
-// error.
+// absolute time in the local zone. If a clock on "today" would land in the
+// past, it rolls forward to tomorrow (useful for due dates). Empty input
+// returns the zero time and no error.
+//
+// Use ParseNoRoll when the caller wants the literal time even if it is in the
+// past (e.g. calendar blocking).
 func Parse(s string, ref time.Time) (time.Time, error) {
+	return parseWithRoll(s, ref, true)
+}
+
+// ParseNoRoll is like Parse but never rolls a past "today" time to tomorrow.
+func ParseNoRoll(s string, ref time.Time) (time.Time, error) {
+	return parseWithRoll(s, ref, false)
+}
+
+func parseWithRoll(s string, ref time.Time, roll bool) (time.Time, error) {
 	s = strings.TrimSpace(strings.ToLower(s))
 	if s == "" {
 		return time.Time{}, nil
@@ -69,7 +82,7 @@ func Parse(s string, ref time.Time) (time.Time, error) {
 			clock.Hour, clock.Min, 0, 0, now.Location())
 		// If the target lands on today but the clock already passed, roll to
 		// tomorrow. (Explicit weekdays never land on today via nextWeekday.)
-		if isSameDay(day, now) && result.Before(now) {
+		if roll && isSameDay(day, now) && result.Before(now) {
 			result = result.AddDate(0, 0, 1)
 		}
 	} else {

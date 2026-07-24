@@ -149,13 +149,13 @@ func dueLabel(t time.Time) string {
 	default:
 		style = dim
 	}
-	label := "due " + relativeDate(t)
+	label := "due " + RelativeDate(t)
 	return style.Render(label)
 }
 
-// relativeDate turns a time into a short human label: "today", "tomorrow",
+// RelativeDate turns a time into a short human label: "today", "tomorrow",
 // "in 3d", "2d ago", or an absolute date for far times.
-func relativeDate(t time.Time) string {
+func RelativeDate(t time.Time) string {
 	t = t.Local()
 	now := time.Now().Local()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())

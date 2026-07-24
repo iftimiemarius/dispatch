@@ -66,10 +66,13 @@ func Root() *cobra.Command {
 		newAddCmd(),
 		newLsCmd(),
 		newTaskCmd(),
+		newProjectCmd(),
+		newInitiativeCmd(),
 		// Top-level convenience shortcuts for the most common task actions.
 		newTaskDoneCmd(),
 		newTaskRmCmd(),
 		newTaskStartCmd(),
+		newTaskMvCmd(),
 	)
 	return root
 }

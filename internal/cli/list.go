@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/iftimiemarius/dispatch/internal/models"
 	"github.com/iftimiemarius/dispatch/internal/store"
@@ -20,6 +19,7 @@ func newLsCmd() *cobra.Command {
 		tag      string
 		inbox    bool
 		all      bool // include done/cancelled
+		group    string
 	)
 	cmd := &cobra.Command{
 		Use:     "ls",
@@ -73,6 +73,12 @@ them. Common filters: --inbox, --status doing, --project api, -t bug.`,
 			}
 
 			projectNames := loadProjectNames(ctx, st)
+
+			if group == "project" {
+				renderGroupedByProject(cmd.OutOrStdout(), tasks, projectNames)
+				return nil
+			}
+
 			rows := make([]ui.TaskRow, 0, len(tasks))
 			for _, t := range tasks {
 				row := ui.TaskRow{
@@ -100,7 +106,49 @@ them. Common filters: --inbox, --status doing, --project api, -t bug.`,
 	cmd.Flags().StringVarP(&tag, "tag", "t", "", "filter by tag")
 	cmd.Flags().BoolVar(&inbox, "inbox", false, "show only inbox tasks")
 	cmd.Flags().BoolVar(&all, "all", false, "include done/cancelled tasks")
+	cmd.Flags().StringVar(&group, "group", "", "group tasks by: project")
 	return cmd
+}
+
+// renderGroupedByProject prints tasks grouped under project headers, with an
+// "Inbox" bucket for unlinked tasks first.
+func renderGroupedByProject(out interface{ Write([]byte) (int, error) }, tasks []*models.Task, projectNames map[string]string) {
+	// bucket key = project id, "" for inbox
+	buckets := map[string][]*models.Task{}
+	order := []string{""} // inbox first
+	for _, t := range tasks {
+		key := ""
+		if t.ProjectID != nil {
+			key = *t.ProjectID
+			if _, seen := buckets[key]; !seen {
+				order = append(order, key)
+			}
+		}
+		buckets[key] = append(buckets[key], t)
+	}
+	w := func(s string) { fmt.Fprintln(out, s) }
+	for i, key := range order {
+		if i > 0 {
+			w("")
+		}
+		label := ui.Section("Inbox")
+		if key != "" {
+			name := projectNames[key]
+			if name == "" {
+				name = key
+			}
+			label = ui.Section("#" + name)
+		}
+		w(label)
+		rows := make([]ui.TaskRow, 0, len(buckets[key]))
+		for _, t := range buckets[key] {
+			rows = append(rows, ui.TaskRow{
+				ID: t.ID, Priority: t.Priority, Status: t.Status,
+				Title: t.Title, Tags: t.Tags, DueAt: t.DueAt,
+			})
+		}
+		w(ui.RenderTaskTable(rows))
+	}
 }
 
 // filterFinished removes done/cancelled unless --all was set or the user
@@ -131,6 +179,3 @@ func loadProjectNames(ctx context.Context, st *store.Store) map[string]string {
 	}
 	return m
 }
-
-// keep time import referenced for future due filtering helpers.
-var _ = time.Now

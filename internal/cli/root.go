@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"github.com/iftimiemarius/dispatch/internal/config"
+	"github.com/iftimiemarius/dispatch/internal/tui"
 	"github.com/iftimiemarius/dispatch/internal/store"
 	"github.com/spf13/cobra"
 )
@@ -22,7 +23,10 @@ type storeKey struct{}
 
 // Root builds and returns the root command. Calling Execute on it runs the app.
 func Root() *cobra.Command {
-	var dbPathOverride string
+	var (
+		dbPathOverride string
+		noTUI          bool
+	)
 
 	root := &cobra.Command{
 		Use:           "dispatch",
@@ -55,11 +59,21 @@ func Root() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Bare `dispatch` (no args, no flags) launches the interactive TUI.
+			// `--help`/`--version`/subcommands resolve before RunE, so they're
+			// unaffected. `--no-tui` forces the legacy help-on-bare behavior.
+			if noArgsNoFlags() && !noTUI {
+				return tui.Run(cmd.Context(), MustStore(cmd))
+			}
 			return cmd.Help()
 		},
 	}
 
 	root.PersistentFlags().StringVar(&dbPathOverride, "db", "", "path to the database file (overrides XDG default)")
+	root.PersistentFlags().BoolVar(&noTUI, "no-tui", false, "don't launch the TUI on bare invocation (print help instead)")
+
+	// noArgsNoFlags (package-level) reports whether the user invoked dispatch
+	// with no arguments and no flags — the trigger for launching the TUI.
 
 	root.AddCommand(
 		newVersionCmd(),
@@ -82,6 +96,13 @@ func Root() *cobra.Command {
 		newTaskMvCmd(),
 	)
 	return root
+}
+
+// noArgsNoFlags reports whether dispatch was invoked with no arguments and no
+// flags (just `dispatch`) — the trigger for launching the TUI. os.Args[0] is
+// the program name; any additional entry is an arg or flag.
+func noArgsNoFlags() bool {
+	return len(os.Args) <= 1
 }
 
 // Execute runs the root command, prints errors to stderr, and returns an exit

@@ -80,25 +80,28 @@ type TaskRow struct {
 	Project  string // resolved project name, optional
 }
 
-// RenderTaskTable renders a header plus rows for the given tasks.
+// RenderTaskTable renders rows for the given tasks.
+//
+// Layout: the title is shown first (with an inline status marker), followed by
+// metadata (priority, project, tags, due). The task ID appears last, in a
+// shortened form, so it doesn't dominate the line.
 func RenderTaskTable(rows []TaskRow) string {
 	if len(rows) == 0 {
 		return dim.Render("No tasks.")
 	}
 	var b strings.Builder
 	for _, r := range rows {
-		statusTok := statusToken(r.Status)
-		prio := priorityStyle(r.Priority).Render(PriorityLabel(r.Priority))
-		id := dim.Render(r.ID)
+		marker := statusMarker(r.Status)
 		title := r.Title
 		if r.Status == models.StatusDone {
 			title = statusDone.Render(title)
 		}
 		var parts []string
-		parts = append(parts, fmt.Sprintf("%-8s", id))
-		parts = append(parts, fmt.Sprintf("%-7s", statusTok))
-		parts = append(parts, fmt.Sprintf("%-7s", prio))
-		parts = append(parts, title)
+		parts = append(parts, marker+" "+title)
+		if r.Priority != models.PriorityMedium {
+			// Medium is the default; hide it to reduce noise. Show others.
+			parts = append(parts, priorityStyle(r.Priority).Render(PriorityLabel(r.Priority)))
+		}
 		if r.Project != "" {
 			parts = append(parts, dim.Render("#"+r.Project))
 		}
@@ -112,10 +115,20 @@ func RenderTaskTable(rows []TaskRow) string {
 		if r.DueAt != nil {
 			parts = append(parts, dueLabel(*r.DueAt))
 		}
+		// Short ID goes last, dimmed.
+		parts = append(parts, dim.Render(ShortID(r.ID)))
 		b.WriteString(strings.Join(parts, "  "))
 		b.WriteString("\n")
 	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// ShortID returns the last 6 characters of a dispatch ID for compact display.
+func ShortID(id string) string {
+	if len(id) <= 6 {
+		return id
+	}
+	return id[len(id)-6:]
 }
 
 func statusToken(s models.TaskStatus) string {
@@ -134,6 +147,25 @@ func statusToken(s models.TaskStatus) string {
 		return dim.Render("[-]")
 	}
 	return string(s)
+}
+
+// statusMarker is a compact colored glyph that leads a task row.
+func statusMarker(s models.TaskStatus) string {
+	switch s {
+	case models.StatusTodo:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Render("○")
+	case models.StatusDoing:
+		return statusDoing.Render("◐")
+	case models.StatusDone:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("✓")
+	case models.StatusBlocked:
+		return statusBlock.Render("✗")
+	case models.StatusInbox:
+		return statusInbox.Render("?")
+	case models.StatusCancelled:
+		return dim.Render("–")
+	}
+	return " "
 }
 
 func dueLabel(t time.Time) string {

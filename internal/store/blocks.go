@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/iftimiemarius/dispatch/internal/models"
@@ -36,6 +37,32 @@ func (s *Store) GetBlock(ctx context.Context, id string) (*models.Block, error) 
 		return nil, err
 	}
 	return b, nil
+}
+
+// ResolveBlock accepts a full block ID or a short suffix and returns the
+// matching block, returning ErrAmbiguous when a suffix matches several.
+func (s *Store) ResolveBlock(ctx context.Context, ref string) (*models.Block, error) {
+	if b, err := s.GetBlock(ctx, ref); err == nil {
+		return b, nil
+	}
+	list, err := s.ListBlocks(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	var matches []*models.Block
+	for _, b := range list {
+		if strings.HasSuffix(b.ID, ref) {
+			matches = append(matches, b)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return nil, ErrNotFound
+	case 1:
+		return matches[0], nil
+	default:
+		return nil, fmt.Errorf("%w: %q matches %d blocks", ErrAmbiguous, ref, len(matches))
+	}
 }
 
 // BlockRange is an optional half-open window for listing blocks.

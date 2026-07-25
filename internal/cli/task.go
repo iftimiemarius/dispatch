@@ -36,7 +36,7 @@ func newTaskShowCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			st := MustStore(cmd)
 			ctx := cmd.Context()
-			t, err := st.GetTask(ctx, args[0])
+			t, err := resolveTask(ctx, st, args[0])
 			if err != nil {
 				return err
 			}
@@ -80,7 +80,7 @@ func newTaskDoneCmd() *cobra.Command {
 			ctx := cmd.Context()
 			now := time.Now().UTC()
 			for _, id := range args {
-				t, err := st.GetTask(ctx, id)
+				t, err := resolveTask(ctx, st, id)
 				if err != nil {
 					return err
 				}
@@ -123,7 +123,7 @@ func newTaskStartCmd() *cobra.Command {
 func setStatus(cmd *cobra.Command, id string, status models.TaskStatus) error {
 	st := MustStore(cmd)
 	ctx := cmd.Context()
-	t, err := st.GetTask(ctx, id)
+	t, err := resolveTask(ctx, st, id)
 	if err != nil {
 		return err
 	}
@@ -147,7 +147,7 @@ func newTaskEditCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			st := MustStore(cmd)
 			ctx := cmd.Context()
-			t, err := st.GetTask(ctx, args[0])
+			t, err := resolveTask(ctx, st, args[0])
 			if err != nil {
 				return err
 			}
@@ -227,7 +227,7 @@ func newTaskRmCmd() *cobra.Command {
 			st := MustStore(cmd)
 			ctx := cmd.Context()
 			for _, id := range args {
-				t, err := st.GetTask(ctx, id)
+				t, err := resolveTask(ctx, st, id)
 				if err != nil {
 					return err
 				}
@@ -257,7 +257,7 @@ func newTaskMvCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			st := MustStore(cmd)
 			ctx := cmd.Context()
-			t, err := st.GetTask(ctx, args[0])
+			t, err := resolveTask(ctx, st, args[0])
 			if err != nil {
 				return err
 			}

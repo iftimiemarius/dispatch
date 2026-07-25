@@ -240,16 +240,9 @@ func newProjectEditCmd() *cobra.Command {
 	return cmd
 }
 
-// findProject resolves a name or ID to a project.
+// findProject resolves a name, full ID, or short ID to a project.
 func findProject(ctx context.Context, st *store.Store, ref string) (*models.Project, error) {
-	if p, err := st.GetProject(ctx, ref); err == nil {
-		return p, nil
-	}
-	p, err := st.GetProjectByName(ctx, ref)
-	if err != nil {
-		return nil, fmt.Errorf("project %q not found", ref)
-	}
-	return p, nil
+	return resolveProjectRef(ctx, st, ref)
 }
 
 // projectTaskCounts returns project-id -> count of non-finished tasks.

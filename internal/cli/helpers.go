@@ -2,12 +2,60 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/iftimiemarius/dispatch/internal/models"
 	"github.com/iftimiemarius/dispatch/internal/store"
 	"github.com/iftimiemarius/dispatch/internal/timeparse"
 )
+
+// resolveTask resolves a task reference (full ID, short ID suffix) into a task,
+// turning store errors into friendly CLI messages.
+func resolveTask(ctx context.Context, st *store.Store, ref string) (*models.Task, error) {
+	t, err := st.ResolveTask(ctx, ref)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, fmt.Errorf("no task matching %q (try `dispatch ls`)", ref)
+		}
+		if errors.Is(err, store.ErrAmbiguous) {
+			return nil, fmt.Errorf("%w — use more characters", err)
+		}
+		return nil, err
+	}
+	return t, nil
+}
+
+// resolveProjectRef resolves a project reference (full ID, short ID, or name).
+func resolveProjectRef(ctx context.Context, st *store.Store, ref string) (*models.Project, error) {
+	p, err := st.ResolveProject(ctx, ref)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, fmt.Errorf("no project matching %q", ref)
+		}
+		if errors.Is(err, store.ErrAmbiguous) {
+			return nil, fmt.Errorf("%w — use more characters", err)
+		}
+		return nil, err
+	}
+	return p, nil
+}
+
+// resolveBlockRef resolves a block reference (full ID or short ID suffix).
+func resolveBlockRef(ctx context.Context, st *store.Store, ref string) (*models.Block, error) {
+	b, err := st.ResolveBlock(ctx, ref)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, fmt.Errorf("no block matching %q", ref)
+		}
+		if errors.Is(err, store.ErrAmbiguous) {
+			return nil, fmt.Errorf("%w — use more characters", err)
+		}
+		return nil, err
+	}
+	return b, nil
+}
 
 // parseDue converts a due flag string to an absolute time, anchored to now.
 func parseDue(s string, now time.Time) (time.Time, error) {
@@ -21,16 +69,12 @@ func parseDue(s string, now time.Time) (time.Time, error) {
 	return t, nil
 }
 
-// resolveProjectID accepts a project name or ID and returns its ID, verifying
-// it exists.
+// resolveProjectID accepts a project name, full ID, or short ID and returns its
+// full ID, verifying it exists.
 func resolveProjectID(ctx context.Context, st *store.Store, ref string) (string, error) {
-	// Try by ID first (cheap).
-	if p, err := st.GetProject(ctx, ref); err == nil {
-		return p.ID, nil
-	}
-	p, err := st.GetProjectByName(ctx, ref)
+	p, err := resolveProjectRef(ctx, st, ref)
 	if err != nil {
-		return "", fmt.Errorf("project %q not found", ref)
+		return "", err
 	}
 	return p.ID, nil
 }

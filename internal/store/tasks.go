@@ -59,7 +59,38 @@ func (s *Store) GetTask(ctx context.Context, id string) (*models.Task, error) {
 	return t, nil
 }
 
-// ListTasks returns tasks matching the query, ordered by priority (urgent first)
+// ResolveTask accepts either a full task ID or a short suffix (the last N
+// characters, as shown in listings) and returns the matching task. If the
+// short suffix matches more than one task, ErrAmbiguous is returned so the
+// caller can ask for a longer prefix.
+func (s *Store) ResolveTask(ctx context.Context, ref string) (*models.Task, error) {
+	// Fast path: exact full-ID match.
+	if t, err := s.GetTask(ctx, ref); err == nil {
+		return t, nil
+	}
+	// Slow path: match by suffix. ULIDs are 26 chars; a short ref is a suffix.
+	list, err := s.ListTasks(ctx, TaskQuery{})
+	if err != nil {
+		return nil, err
+	}
+	var matches []*models.Task
+	for _, t := range list {
+		if strings.HasSuffix(t.ID, ref) {
+			matches = append(matches, t)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return nil, ErrNotFound
+	case 1:
+		return matches[0], nil
+	default:
+		return nil, fmt.Errorf("%w: %q matches %d tasks", ErrAmbiguous, ref, len(matches))
+	}
+}
+
+// ErrAmbiguous is returned when a short reference matches multiple entities.
+var ErrAmbiguous = errors.New("ambiguous reference")
 // then due date then creation.
 func (s *Store) ListTasks(ctx context.Context, q TaskQuery) ([]*models.Task, error) {
 	var (

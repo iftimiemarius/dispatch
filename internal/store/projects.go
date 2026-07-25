@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/iftimiemarius/dispatch/internal/models"
 )
@@ -49,6 +50,38 @@ func (s *Store) GetProjectByName(ctx context.Context, name string) (*models.Proj
 	return p, nil
 }
 
+// ResolveProject accepts a project ID (full or short suffix) or its unique name
+// and returns the matching project. Short-suffix matches that collide return
+// ErrAmbiguous so the caller can request a longer ref.
+func (s *Store) ResolveProject(ctx context.Context, ref string) (*models.Project, error) {
+	// Exact ID.
+	if p, err := s.GetProject(ctx, ref); err == nil {
+		return p, nil
+	}
+	// Exact name.
+	if p, err := s.GetProjectByName(ctx, ref); err == nil {
+		return p, nil
+	}
+	// Short-ID suffix.
+	list, err := s.ListProjects(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	var matches []*models.Project
+	for _, p := range list {
+		if strings.HasSuffix(p.ID, ref) {
+			matches = append(matches, p)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return nil, ErrNotFound
+	case 1:
+		return matches[0], nil
+	default:
+		return nil, fmt.Errorf("%w: %q matches %d projects", ErrAmbiguous, ref, len(matches))
+	}
+}
 // ListProjects returns all projects, optionally filtered by initiative.
 func (s *Store) ListProjects(ctx context.Context, initiativeID *string) ([]*models.Project, error) {
 	query := projectSelect

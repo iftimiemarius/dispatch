@@ -5,7 +5,7 @@ PKG      := github.com/iftimiemarius/dispatch
 LDFLAGS  := -X $(PKG)/internal/cli.Version=$(VERSION)
 BINARY   := dispatch
 
-.PHONY: all build run test vet fmt tidy clean install
+.PHONY: all build run test vet fmt tidy clean install install-skill uninstall-skill
 
 all: build
 
@@ -41,3 +41,14 @@ install: build
 ## clean: remove build artifacts
 clean:
 	rm -f $(BINARY)
+
+## install-skill: symlink the dispatch ZCode skill into ~/.zcode/skills (user scope)
+install-skill:
+	@mkdir -p $(HOME)/.zcode/skills
+	@ln -sfn $(CURDIR)/skills/dispatch $(HOME)/.zcode/skills/dispatch
+	@echo "Skill 'dispatch' linked to ~/.zcode/skills/dispatch (restart ZCode to load)"
+
+## uninstall-skill: remove the dispatch ZCode skill link
+uninstall-skill:
+	@rm -f $(HOME)/.zcode/skills/dispatch
+	@echo "Skill 'dispatch' unlinked"

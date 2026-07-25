@@ -87,8 +87,9 @@ be given with --day (default: today). Examples:
 
 			title := joinArgs(args)
 			if title == "" && taskID != "" {
-				if t, err := st.GetTask(ctx, taskID); err == nil {
+				if t, err := resolveTask(ctx, st, taskID); err == nil {
 					title = t.Title
+					taskID = t.ID // normalize to full ID
 				}
 			}
 			if title == "" {
@@ -105,11 +106,13 @@ be given with --day (default: today). Examples:
 				UpdatedAt: now.UTC(),
 			}
 			if taskID != "" {
-				// Verify the task exists before linking.
-				if _, err := st.GetTask(ctx, taskID); err != nil {
+				// Verify the task exists before linking (and normalize to full ID).
+				t, err := resolveTask(ctx, st, taskID)
+				if err != nil {
 					return err
 				}
-				b.TaskID = &taskID
+				full := t.ID
+				b.TaskID = &full
 			}
 			if err := st.CreateBlock(ctx, b); err != nil {
 				return err
@@ -210,7 +213,7 @@ func newBlockRmCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			st := MustStore(cmd)
 			ctx := cmd.Context()
-			b, err := st.GetBlock(ctx, args[0])
+			b, err := resolveBlockRef(ctx, st, args[0])
 			if err != nil {
 				return err
 			}

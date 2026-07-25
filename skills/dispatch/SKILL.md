@@ -96,6 +96,33 @@ dispatch next                # the one task to focus on now
 dispatch next --start        # ...and mark it in-progress
 ```
 
+### GitHub (link + read, via gh CLI)
+
+```sh
+dispatch gh link <id> "#42"            # link task to issue/PR (#42, 42, owner/name#42, URL)
+dispatch gh show <id>                  # linked issue/PR: title, state, URL
+dispatch gh prs --repo owner/name      # open PRs
+dispatch gh issues --repo owner/name   # open issues
+dispatch gh unlink <id>                # remove GitHub link
+```
+
+Repos resolve: ref's own repo → `--repo` → task's override → project default
+(`project add/edit --github-repo owner/name`). Linked tasks show a `GH#42` badge.
+Uses the user's existing `gh auth login` — no token juggling.
+
+### Outlook (Microsoft Graph calendar sync)
+
+```sh
+dispatch auth login outlook      # one-time OAuth (PKCE)
+dispatch auth status             # what's connected
+dispatch block sync <id>         # push block → Outlook event (create or update)
+dispatch block sync --range week # sync all blocks in a window
+dispatch block unsync <id>       # delete the Outlook event
+```
+
+Re-sync updates the existing event (idempotent). Requires `[outlook]` config in
+config.toml — see README "Setup: Outlook".
+
 ## Time input
 
 `--due` and block times accept: `today`, `tomorrow 9am`, `fri`, `next mon`, `+2h`, `3d`, `1w`, `2025-12-01`, `9am`, `14:30`.

@@ -25,6 +25,8 @@ func newBlockCmd() *cobra.Command {
 		newBlockAddCmd(),
 		newBlockLsCmd(),
 		newBlockRmCmd(),
+		newBlockSyncCmd(),
+		newBlockUnsyncCmd(),
 	)
 	return cmd
 }
@@ -280,9 +282,50 @@ func filterFuture(blocks []*models.Block) []*models.Block {
 func newCalendarCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "calendar",
-		Short: "Calendar export (.ics)",
+		Short: "Calendar export (.ics) and Outlook sync",
 	}
-	cmd.AddCommand(newCalendarExportCmd())
+	cmd.AddCommand(newCalendarExportCmd(), newCalendarSyncCmd())
+	return cmd
+}
+
+// newCalendarSyncCmd syncs all blocks in a window to Outlook. It's the
+// calendar-level entry point; `block sync --range` does the same thing.
+func newCalendarSyncCmd() *cobra.Command {
+	var rangeFlag string
+	cmd := &cobra.Command{
+		Use:   "sync",
+		Short: "Sync all blocks to Outlook calendar",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			st := MustStore(cmd)
+			ctx := cmd.Context()
+			_, gc, err := outlookClient()
+			if err != nil {
+				return err
+			}
+			r := resolveBlockRange(rangeFlag)
+			blocks, err := st.ListBlocks(ctx, r)
+			if err != nil {
+				return err
+			}
+			if len(blocks) == 0 {
+				fmt.Fprintln(cmd.OutOrStdout(), ui.Dim("No blocks in range."))
+				return nil
+			}
+			ok, failed := 0, 0
+			for _, b := range blocks {
+				if err := syncOne(cmd, gc, b); err != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "  %s FAILED: %v\n", ui.Dim(b.ID), err)
+					failed++
+				} else {
+					ok++
+				}
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Synced %d, failed %d.\n", ok, failed)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&rangeFlag, "range", "all", "range: today|week|all")
 	return cmd
 }
 

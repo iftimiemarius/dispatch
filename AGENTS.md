@@ -53,11 +53,16 @@ internal/
 - **One command family per file** in `internal/cli/` (task.go, project.go, …).
 - **Store layer** owns all SQL; the CLI never writes raw SQL. Add new queries as
   methods on `*Store` in the matching `internal/store/<entity>.go`.
+- **Migrations**: add new columns/tables in `internal/store/migrations/NNN_*.sql`
+  AND `schema.sql` (baseline), then bump `currentSchemaVersion`. The runner
+  tolerates duplicate-column errors (idempotent).
 - **Resolvers**: use `Resolve*` (full ID, short ID, or name) for lookups — never
   assume a full ID. `ResolveTask`/`ResolveProject`/`ResolveBlock` exist.
 - **Display**: titles first, short IDs last, medium-priority hidden in tables.
   See `internal/ui/render.go`.
 - **Time input** flows through `internal/timeparse` — extend there, not inline.
+- **Integrations**: GitHub reuses `gh` (internal/github); Outlook uses Microsoft
+  Graph OAuth+PKCE (internal/graph). Both degrade gracefully when unavailable.
 - **New commands** must be registered in `internal/cli/root.go`'s `AddCommand`.
   Commands that don't need the DB set `Annotations: map[string]string{"skip_db": "true"}`.
 

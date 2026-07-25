@@ -138,6 +138,48 @@ dispatch calendar export --print --range today
 
 Import the `.ics` into any calendar app (Google Calendar, Apple Calendar, etc.).
 
+#### Sync to Outlook (Microsoft Graph)
+
+Connect your Microsoft account once, then push blocks as real calendar events:
+
+```sh
+dispatch auth login outlook      # one-time OAuth (PKCE, no client secret needed)
+dispatch auth status             # see what's connected
+
+dispatch block sync <id>         # push a block → Outlook event (creates or updates)
+dispatch block sync --range week # sync all blocks in a window
+dispatch block unsync <id>       # delete the Outlook event, clear the link
+dispatch calendar sync --range week   # alias for syncing a window
+```
+
+Re-syncing a block updates the existing event (idempotent via the stored Graph
+event id). See [Setup: Outlook](#setup-outlook) for the Azure app registration.
+
+### GitHub
+
+Link tasks to issues/PRs and view them. Dispatch reuses your `gh` CLI for auth
+(run `gh auth login` once) — no token juggling.
+
+```sh
+# Set a project default repo, then link by number (repo auto-resolves)
+dispatch project add "api" --github-repo owner/name
+dispatch add "fix bug" -p api
+dispatch gh link <id> "#42"
+
+# Or link directly to any repo
+dispatch gh link <id> "owner/name#42"
+dispatch gh link <id> "https://github.com/owner/name/pull/42"
+
+dispatch gh show <id>            # linked issue/PR: title, state, URL
+dispatch gh prs --repo owner/name
+dispatch gh issues --repo owner/name
+dispatch gh unlink <id>
+```
+
+Repos resolve in order: the link ref's own repo → `--repo` flag → the task's
+override (`--repo`) → the project's default (`--github-repo`). Linked tasks
+show a `GH#42` badge in listings.
+
 ### Focus
 
 ```sh
@@ -162,6 +204,39 @@ Due dates and block times accept developer-friendly forms:
 | `9am`, `14:30`    | a clock (defaults to today)          |
 
 For due dates, a clock on "today" that has already passed rolls forward to tomorrow. For blocks, the literal time is used.
+
+## Setup: Outlook (optional)
+
+Outlook sync uses Microsoft Graph with OAuth (Authorization Code + PKCE), so **no client secret** is required. One-time Azure setup:
+
+1. Azure Portal → Microsoft Entra ID → App registrations → New registration
+2. Supported account type: **"Accounts in any organizational directory + Personal"** (or "Personal only")
+3. **Add a platform → "Mobile and desktop applications"** → redirect URI: `http://localhost:8484/callback`
+   - *(Important: use the Mobile/desktop platform, NOT "Web" — Web marks the app as a confidential client and demands a secret.)*
+4. Advanced settings → **"Allow public client flows"** → **Yes** → Save
+5. API permissions → add Microsoft Graph → **Delegated** → `Calendars.ReadWrite`
+6. Copy the **Application (client) ID** into your config
+
+Then create `~/.config/dispatch/config.toml`:
+
+```toml
+[outlook]
+client_id     = "your-app-id-here"
+tenant        = "common"      # "common" (any+personal), "consumers" (personal only), "organizations", or a tenant GUID
+redirect_port = 8484          # must match the redirect URI
+```
+
+Finally connect: `dispatch auth login outlook`. Tokens are stored in your OS keyring (Secret Service / Keychain / Credential Manager) with an encrypted-file fallback.
+
+## Setup: GitHub (optional)
+
+GitHub features reuse the `gh` CLI — just ensure it's installed and authenticated:
+
+```sh
+gh auth login
+```
+
+That's it. Dispatch shells out to `gh` for all GitHub calls, so it inherits your existing scopes (needs `repo`). No config file entry required.
 
 ## Project layout
 

@@ -39,6 +39,7 @@ func TestRenderOnce_ShowsTasks(t *testing.T) {
 	out := buf.String()
 	// Should contain the tab labels and both task titles.
 	for _, want := range []string{"Tasks", "Projects", "Initiatives", "Schedule", "fix login bug", "write docs"} {
+		t.Log("FORM FRAME:\n" + out)
 		if !strings.Contains(out, want) {
 			t.Errorf("render missing %q\n--- output ---\n%s", want, out)
 		}
@@ -119,4 +120,34 @@ func TestRenderOnce_PrintOutput(t *testing.T) {
 	var buf bytes.Buffer
 	_ = RenderOnce(ctx, st, &buf)
 	t.Log("\n" + buf.String())
+}
+
+func TestRenderForm_NewTask(t *testing.T) {
+	dir := t.TempDir()
+	st, err := store.Open(filepath.Join(dir, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	a := newApp(context.Background(), st)
+	// Simulate pressing 'n' on the Tasks view → opens new-task form.
+	a.active = viewTasks
+	ma, _ := a.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	a = ma.(*app)
+	_, _, handled := a.handleAction(testKeyEvent("n"))
+	if !handled || a.mode != modeForm || a.form == nil {
+		t.Fatalf("form not opened: mode=%v form=%v handled=%v", a.mode, a.form, handled)
+	}
+	out := a.View()
+	for _, want := range []string{"New task", "Title:", "Priority:", "Status:", "Due:", "Tags:"} {
+		t.Log("FORM FRAME:\n" + out)
+		if !strings.Contains(out, want) {
+			t.Errorf("form missing %q\n---\n%s", want, out)
+		}
+	}
+}
+
+// testKeyEvent builds a KeyMsg for a single key string.
+func testKeyEvent(s string) tea.KeyMsg {
+	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
 }

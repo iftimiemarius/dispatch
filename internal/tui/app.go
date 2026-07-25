@@ -52,6 +52,7 @@ type mode int
 const (
 	modeBrowse mode = iota
 	modeForm
+	modeConfirm
 	modeDetail
 )
 
@@ -61,6 +62,8 @@ type app struct {
 	store  *store.Store
 	active view
 	mode   mode
+	form   *formState   // non-nil in modeForm
+	confirm *confirmState // non-nil in modeConfirm
 
 	width, height int
 
@@ -157,6 +160,15 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // handleKey dispatches top-level keys.
 func (a *app) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Form mode handles its own keys and swallows everything else.
+	if a.mode == modeForm && a.form != nil {
+		return a.formUpdate(msg)
+	}
+	// Confirm mode intercepts y/n for delete confirmation.
+	if a.mode == modeConfirm && a.confirm != nil {
+		return a.confirmUpdate(msg)
+	}
+
 	switch {
 	case key.Matches(msg, km.ForceQuit):
 		return a, tea.Quit
@@ -179,6 +191,13 @@ func (a *app) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 
+	// Action keys (only in browse mode, on a selected item).
+	if a.mode == modeBrowse {
+		if m, cmd, handled := a.handleAction(msg); handled {
+			return m, cmd
+		}
+	}
+
 	// Otherwise, forward navigation keys to the current list.
 	if cur := a.curList(); cur != nil {
 		m, cmd := cur.Update(msg)
@@ -197,10 +216,18 @@ func (a *app) View() string {
 	b.WriteString(a.renderTabs())
 	b.WriteByte('\n')
 
+	// Form mode replaces the list body with the editor.
+	if a.mode == modeForm && a.form != nil {
+		b.WriteString(a.renderForm())
+		return b.String()
+	}
+	// Confirm mode overlays on top of the (dimmed) list body.
 	cur := a.curList()
 	if cur != nil {
-		// Give the list the space below the tab bar, status bar, and help bar.
 		b.WriteString(cur.View())
+	}
+	if a.mode == modeConfirm {
+		b.WriteString(a.renderConfirm())
 	}
 	b.WriteByte('\n')
 	b.WriteString(a.renderStatus())

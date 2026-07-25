@@ -151,3 +151,32 @@ func TestRenderForm_NewTask(t *testing.T) {
 func testKeyEvent(s string) tea.KeyMsg {
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
 }
+
+func TestRenderDetail_Task(t *testing.T) {
+	dir := t.TempDir()
+	st, _ := store.Open(filepath.Join(dir, "t.db"))
+	defer st.Close()
+	ctx := context.Background()
+	now := time.Now()
+	due := now.Add(2 * 24 * time.Hour)
+	mustCreate(t, st.CreateTask(ctx, &models.Task{
+		ID: "T1", Title: "fix login bug", Status: models.StatusDoing, Priority: models.PriorityHigh,
+		Notes: "redirect loop on /auth", Tags: []string{"bug", "auth"}, DueAt: &due,
+		CreatedAt: now, UpdatedAt: now,
+	}))
+	a := newApp(ctx, st)
+	a.active = viewTasks
+	ma, _ := a.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	a = ma.(*app)
+	// Press Enter to open detail.
+	a.handleAction(testKeyEvent("enter"))
+	if a.mode != modeDetail {
+		t.Fatalf("detail not opened: mode=%v", a.mode)
+	}
+	out := a.View()
+	for _, want := range []string{"fix login bug", "status:", "priority:", "due:", "tags:", "redirect loop"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("detail missing %q\n---\n%s", want, out)
+		}
+	}
+}

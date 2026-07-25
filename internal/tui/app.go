@@ -62,8 +62,9 @@ type app struct {
 	store  *store.Store
 	active view
 	mode   mode
-	form   *formState   // non-nil in modeForm
+	form   *formState     // non-nil in modeForm
 	confirm *confirmState // non-nil in modeConfirm
+	detail *detailState   // non-nil in modeDetail
 
 	width, height int
 
@@ -168,6 +169,10 @@ func (a *app) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if a.mode == modeConfirm && a.confirm != nil {
 		return a.confirmUpdate(msg)
 	}
+	// Detail mode handles its own keys.
+	if a.mode == modeDetail && a.detail != nil {
+		return a.detailUpdate(msg)
+	}
 
 	switch {
 	case key.Matches(msg, km.ForceQuit):
@@ -219,6 +224,11 @@ func (a *app) View() string {
 	// Form mode replaces the list body with the editor.
 	if a.mode == modeForm && a.form != nil {
 		b.WriteString(a.renderForm())
+		return b.String()
+	}
+	// Detail mode replaces the list body with the full-item view.
+	if a.mode == modeDetail && a.detail != nil {
+		b.WriteString(a.renderDetail())
 		return b.String()
 	}
 	// Confirm mode overlays on top of the (dimmed) list body.

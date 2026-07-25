@@ -20,12 +20,16 @@ func (a *app) handleAction(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		return a.actTaskStatus(it, models.StatusDone, "done")
 	case key.Matches(msg, km.Start) && hasSel && it.kind == "task":
 		return a.actTaskStatus(it, models.StatusDoing, "in-progress")
+	case key.Matches(msg, km.Sync) && hasSel && it.kind == "block":
+		return a.actSyncBlock(it)
 	case key.Matches(msg, km.Delete) && hasSel:
 		return a.actDelete(it)
 	case key.Matches(msg, km.New):
 		return a.actNew()
 	case key.Matches(msg, km.Edit) && hasSel:
 		return a.actEdit(it)
+	case key.Matches(msg, km.Detail) && hasSel:
+		return a.openDetail(it)
 	}
 	return a, nil, false
 }
@@ -113,7 +117,22 @@ func (a *app) actEdit(it item) (tea.Model, tea.Cmd, bool) {
 	return a, nil, true
 }
 
-// activeKind maps the active view to its entity kind string.
+// actSyncBlock pushes a block to Outlook (create/update). Degrades gracefully
+// if Outlook isn't configured or authenticated.
+func (a *app) actSyncBlock(it item) (tea.Model, tea.Cmd, bool) {
+	blk := it.raw.(*models.Block)
+	id, err := syncBlockToOutlook(a.ctx, blk)
+	if err != nil {
+		a.statusMsg = "outlook sync failed: " + err.Error()
+		return a, nil, true
+	}
+	blk.OutlookEventID = &id
+	blk.UpdatedAt = time.Now().UTC()
+	_ = a.store.UpdateBlock(a.ctx, blk)
+	a.statusMsg = "synced to outlook"
+	a.reloadSchedule()
+	return a, nil, true
+}
 func (a *app) activeKind() string {
 	switch a.active {
 	case viewTasks:

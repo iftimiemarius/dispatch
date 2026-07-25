@@ -59,6 +59,9 @@ func newTaskShowCmd() *cobra.Command {
 			if t.DueAt != nil {
 				fmt.Fprintf(out, "%s%s\n", ui.Dim("due: "), t.DueAt.Local().Format("Mon Jan 2 15:04"))
 			}
+			if t.GitHubRepo != nil && t.GitHubIssue != nil {
+				fmt.Fprintf(out, "%s%s#%d\n", ui.Dim("github: "), *t.GitHubRepo, *t.GitHubIssue)
+			}
 			if t.Notes != "" {
 				fmt.Fprintln(out)
 				fmt.Fprintln(out, t.Notes)
@@ -200,6 +203,22 @@ func newTaskEditCmd() *cobra.Command {
 						return err
 					}
 					t.DueAt = &due
+				}
+			}
+			if cmd.Flags().Changed("repo") {
+				if flags.repo == "" {
+					t.GitHubRepo = nil
+				} else {
+					r := flags.repo
+					t.GitHubRepo = &r
+				}
+			}
+			if cmd.Flags().Changed("issue") {
+				if flags.issue == 0 {
+					t.GitHubIssue = nil
+				} else {
+					n := flags.issue
+					t.GitHubIssue = &n
 				}
 			}
 			t.UpdatedAt = now

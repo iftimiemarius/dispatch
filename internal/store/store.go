@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -17,9 +18,19 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-// currentSchemaVersion is bumped whenever schema.sql changes; migrations run
-// from the stored version up to this number.
-const currentSchemaVersion = 1
+//go:embed migrations/002_github_outlook.sql
+var migration002 string
+
+// currentSchemaVersion is bumped whenever a new migration is added; the runner
+// applies every migration up to this number. Migration 1 is the baseline
+// schema.sql (applied via CREATE TABLE IF NOT EXISTS for fresh installs).
+const currentSchemaVersion = 2
+
+// migrations maps a version number to its SQL, applied in ascending order.
+// Migration 1 is intentionally absent here — it's the baseline schema.sql.
+var migrations = map[int]string{
+	2: migration002,
+}
 
 // Store wraps a SQLite database connection.
 type Store struct {
@@ -61,25 +72,121 @@ func (s *Store) Close() error {
 // DB exposes the underlying connection for tests that need raw access.
 func (s *Store) DB() *sql.DB { return s.db }
 
-// migrate applies schema.sql on first run and records the version. v1 only
-// has a baseline migration; future schema changes will add numbered steps.
+// migrate brings the database up to currentSchemaVersion.
+//
+// Step 1 applies the baseline schema.sql (CREATE TABLE IF NOT EXISTS) — for
+// fresh installs this creates everything; for existing DBs it's a no-op.
+//
+// Steps 2..N run each numbered migration's SQL that hasn't been recorded yet.
+// Each statement is split and applied individually so that idempotent
+// "ALTER TABLE ADD COLUMN" statements whose column already exists (e.g. a
+// partial earlier run) are tolerated rather than aborting the migration.
 func (s *Store) migrate(ctx context.Context) error {
+	// Baseline: create tables if missing (fresh install or pre-migration DB).
 	if _, err := s.db.ExecContext(ctx, schemaSQL); err != nil {
 		return fmt.Errorf("apply schema: %w", err)
 	}
-
-	// Record current version if not already present (idempotent).
-	var existing int
-	row := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM schema_version WHERE version = ?", currentSchemaVersion)
-	if err := row.Scan(&existing); err != nil {
-		return fmt.Errorf("check version: %w", err)
+	// Record the baseline version so a fresh install doesn't re-run migration 1.
+	if err := s.recordVersion(ctx, 1); err != nil {
+		return err
 	}
-	if existing == 0 {
-		if _, err := s.db.ExecContext(ctx, "INSERT OR IGNORE INTO schema_version(version) VALUES (?)", currentSchemaVersion); err != nil {
-			return fmt.Errorf("record version: %w", err)
+
+	// Apply each numbered migration in ascending order.
+	for v := 2; v <= currentSchemaVersion; v++ {
+		applied, err := s.isApplied(ctx, v)
+		if err != nil {
+			return err
+		}
+		if applied {
+			continue
+		}
+		sqlText, ok := migrations[v]
+		if !ok {
+			// No file for this version; record it as applied to skip future checks.
+			if err := s.recordVersion(ctx, v); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := s.applyMigration(ctx, v, sqlText); err != nil {
+			return fmt.Errorf("migration %d: %w", v, err)
+		}
+		if err := s.recordVersion(ctx, v); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+// applyMigration runs each statement in sqlText individually, tolerating
+// "duplicate column" errors so ADD COLUMN is idempotent. Comments (lines
+// starting with --) are stripped before splitting so they don't lump together
+// with the statement that follows them.
+func (s *Store) applyMigration(ctx context.Context, version int, sqlText string) error {
+	for _, stmt := range splitStatements(stripComments(sqlText)) {
+		stmt = strings.TrimSpace(stmt)
+		if stmt == "" {
+			continue
+		}
+		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
+			if isDuplicateColumnErr(err) {
+				continue
+			}
+			return fmt.Errorf("statement %q: %w", firstLine(stmt), err)
+		}
+	}
+	return nil
+}
+
+// stripComments removes full-line and trailing SQL comments (lines/segments
+// starting with --). Good enough for our migration files.
+func stripComments(sqlText string) string {
+	var b strings.Builder
+	for _, line := range strings.Split(sqlText, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "--") {
+			continue
+		}
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
+func (s *Store) isApplied(ctx context.Context, version int) (bool, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM schema_version WHERE version = ?", version).Scan(&n)
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+func (s *Store) recordVersion(ctx context.Context, version int) error {
+	_, err := s.db.ExecContext(ctx, "INSERT OR IGNORE INTO schema_version(version) VALUES (?)", version)
+	return err
+}
+
+// isDuplicateColumnErr reports whether err is SQLite's "duplicate column name".
+func isDuplicateColumnErr(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "duplicate column")
+}
+
+// splitStatements splits SQL on semicolons at the end of lines, ignoring those
+// inside comments. Good enough for our migration files.
+func splitStatements(sqlText string) []string {
+	var stmts []string
+	for _, line := range strings.Split(sqlText, ";\n") {
+		stmts = append(stmts, line)
+	}
+	return stmts
+}
+
+func firstLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return s[:i]
+	}
+	return s
 }
 
 // tx runs fn inside a transaction, committing on nil error and rolling back
@@ -116,4 +223,12 @@ func nullIfEmpty(s string) any {
 		return nil
 	}
 	return s
+}
+
+// nullInt returns a NULL-bound driver value for a nil *int.
+func nullInt(p *int) any {
+	if p == nil {
+		return nil
+	}
+	return *p
 }

@@ -33,6 +33,7 @@ func newProjectAddCmd() *cobra.Command {
 		color      string
 		status     string
 		initiative string
+		ghRepo     string
 	)
 	cmd := &cobra.Command{
 		Use:   "add <name>",
@@ -61,6 +62,10 @@ func newProjectAddCmd() *cobra.Command {
 				}
 				p.InitiativeID = &iid
 			}
+			if ghRepo != "" {
+				r := ghRepo
+				p.GitHubRepo = &r
+			}
 			if err := st.CreateProject(ctx, p); err != nil {
 				return err
 			}
@@ -72,6 +77,7 @@ func newProjectAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&color, "color", "", "color label")
 	cmd.Flags().StringVar(&status, "status", "active", "status: active|on_hold|done|archived")
 	cmd.Flags().StringVarP(&initiative, "initiative", "i", "", "parent initiative name or ID")
+	cmd.Flags().StringVar(&ghRepo, "github-repo", "", "default GitHub repo (owner/name) for this project's tasks")
 	return cmd
 }
 
@@ -152,10 +158,9 @@ func newProjectShowCmd() *cobra.Command {
 			}
 			rows := make([]ui.TaskRow, 0, len(tasks))
 			for _, t := range tasks {
-				rows = append(rows, ui.TaskRow{
-					ID: t.ID, Priority: t.Priority, Status: t.Status,
-					Title: t.Title, Tags: t.Tags, DueAt: t.DueAt, Project: p.Name,
-				})
+				row := taskRow(t)
+				row.Project = p.Name
+				rows = append(rows, row)
 			}
 			fmt.Fprintln(out, ui.RenderTaskTable(rows))
 			return nil
@@ -193,6 +198,7 @@ func newProjectEditCmd() *cobra.Command {
 		desc       string
 		status     string
 		initiative string
+		ghRepo     string
 	)
 	cmd := &cobra.Command{
 		Use:   "edit <name|id>",
@@ -225,6 +231,14 @@ func newProjectEditCmd() *cobra.Command {
 					p.InitiativeID = &iid
 				}
 			}
+			if cmd.Flags().Changed("github-repo") {
+				if ghRepo == "" {
+					p.GitHubRepo = nil
+				} else {
+					r := ghRepo
+					p.GitHubRepo = &r
+				}
+			}
 			p.UpdatedAt = time.Now().UTC()
 			if err := st.UpdateProject(ctx, p); err != nil {
 				return err
@@ -237,6 +251,7 @@ func newProjectEditCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&desc, "description", "d", "", "description")
 	cmd.Flags().StringVar(&status, "status", "", "status: active|on_hold|done|archived")
 	cmd.Flags().StringVarP(&initiative, "initiative", "i", "", "parent initiative (use \"\" to unlink)")
+	cmd.Flags().StringVar(&ghRepo, "github-repo", "", "default GitHub repo (owner/name); use \"\" to clear")
 	return cmd
 }
 

@@ -51,10 +51,7 @@ func newTodayCmd() *cobra.Command {
 			} else {
 				rows := make([]ui.TaskRow, 0, len(due))
 				for _, t := range due {
-					rows = append(rows, ui.TaskRow{
-						ID: t.ID, Priority: t.Priority, Status: t.Status,
-						Title: t.Title, Tags: t.Tags, DueAt: t.DueAt,
-					})
+					rows = append(rows, taskRow(t))
 				}
 				fmt.Fprintln(out, indentTable(ui.RenderTaskTable(rows)))
 			}
@@ -68,9 +65,7 @@ func newTodayCmd() *cobra.Command {
 			} else {
 				rows := make([]ui.TaskRow, 0, len(inbox))
 				for _, t := range inbox {
-					rows = append(rows, ui.TaskRow{
-						ID: t.ID, Status: t.Status, Title: t.Title,
-					})
+					rows = append(rows, taskRow(t))
 				}
 				fmt.Fprintln(out, indentTable(ui.RenderTaskTable(rows)))
 			}

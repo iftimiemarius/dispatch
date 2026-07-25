@@ -18,6 +18,8 @@ type taskFlags struct {
 	tags     []string
 	due      string
 	notes    string
+	repo     string // GitHub repo override (owner/name)
+	issue    int    // GitHub issue/PR number
 }
 
 func (f *taskFlags) addFlags(c *cobra.Command) {
@@ -27,6 +29,8 @@ func (f *taskFlags) addFlags(c *cobra.Command) {
 	c.Flags().StringSliceVarP(&f.tags, "tag", "t", nil, "tags (repeatable or comma-separated)")
 	c.Flags().StringVar(&f.due, "due", "", "due date/time, e.g. 'tomorrow', 'fri 9am', '2025-12-01', '+3d'")
 	c.Flags().StringVarP(&f.notes, "notes", "n", "", "longer notes")
+	c.Flags().StringVar(&f.repo, "repo", "", "GitHub repo owner/name (overrides project default)")
+	c.Flags().IntVar(&f.issue, "issue", 0, "GitHub issue/PR number to link")
 }
 
 func newAddCmd() *cobra.Command {
@@ -86,6 +90,14 @@ a status or project explicitly.`,
 					return err
 				}
 				t.DueAt = &due
+			}
+			if flags.repo != "" {
+				r := flags.repo
+				t.GitHubRepo = &r
+			}
+			if flags.issue != 0 {
+				n := flags.issue
+				t.GitHubIssue = &n
 			}
 
 			if err := st.CreateTask(ctx, t); err != nil {

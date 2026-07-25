@@ -163,10 +163,7 @@ func newInitShowCmd() *cobra.Command {
 			}
 			rows := make([]ui.TaskRow, 0, len(tasks))
 			for _, t := range tasks {
-				rows = append(rows, ui.TaskRow{
-					ID: t.ID, Priority: t.Priority, Status: t.Status,
-					Title: t.Title, Tags: t.Tags, DueAt: t.DueAt,
-				})
+				rows = append(rows, taskRow(t))
 			}
 			fmt.Fprintln(out, ui.RenderTaskTable(rows))
 			return nil

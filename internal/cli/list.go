@@ -81,14 +81,7 @@ them. Common filters: --inbox, --status doing, --project api, -t bug.`,
 
 			rows := make([]ui.TaskRow, 0, len(tasks))
 			for _, t := range tasks {
-				row := ui.TaskRow{
-					ID:       t.ID,
-					Priority: t.Priority,
-					Status:   t.Status,
-					Title:    t.Title,
-					Tags:     t.Tags,
-					DueAt:    t.DueAt,
-				}
+				row := taskRow(t)
 				if t.ProjectID != nil {
 					if name, ok := projectNames[*t.ProjectID]; ok {
 						row.Project = name
@@ -142,13 +135,23 @@ func renderGroupedByProject(out interface{ Write([]byte) (int, error) }, tasks [
 		w(label)
 		rows := make([]ui.TaskRow, 0, len(buckets[key]))
 		for _, t := range buckets[key] {
-			rows = append(rows, ui.TaskRow{
-				ID: t.ID, Priority: t.Priority, Status: t.Status,
-				Title: t.Title, Tags: t.Tags, DueAt: t.DueAt,
-			})
+			rows = append(rows, taskRow(t))
 		}
 		w(ui.RenderTaskTable(rows))
 	}
+}
+
+// taskRow builds a ui.TaskRow from a task, including its GitHub issue badge.
+func taskRow(t *models.Task) ui.TaskRow {
+	row := ui.TaskRow{
+		ID: t.ID, Priority: t.Priority, Status: t.Status,
+		Title: t.Title, Tags: t.Tags, DueAt: t.DueAt,
+	}
+	if t.GitHubIssue != nil {
+		n := *t.GitHubIssue
+		row.GitHubIssue = &n
+	}
+	return row
 }
 
 // filterFinished removes done/cancelled unless --all was set or the user

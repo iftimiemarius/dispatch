@@ -14,10 +14,11 @@ import (
 // CreateBlock inserts a new calendar block.
 func (s *Store) CreateBlock(ctx context.Context, b *models.Block) error {
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO blocks (id, task_id, title, notes, starts_at, ends_at, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO blocks (id, task_id, title, notes, starts_at, ends_at, outlook_event_id, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		b.ID, nullIfEmpty(ptrString(b.TaskID)), b.Title, b.Notes,
 		b.StartsAt.Format("2006-01-02T15:04:05Z07:00"), b.EndsAt.Format("2006-01-02T15:04:05Z07:00"),
+		nullIfEmpty(ptrString(b.OutlookEventID)),
 		b.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), b.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	)
 	if err != nil {
@@ -126,10 +127,12 @@ func joinClauses(c []string) string {
 func (s *Store) UpdateBlock(ctx context.Context, b *models.Block) error {
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE blocks SET
-			task_id = ?, title = ?, notes = ?, starts_at = ?, ends_at = ?, updated_at = ?
+			task_id = ?, title = ?, notes = ?, starts_at = ?, ends_at = ?,
+			outlook_event_id = ?, updated_at = ?
 		WHERE id = ?`,
 		nullIfEmpty(ptrString(b.TaskID)), b.Title, b.Notes,
 		b.StartsAt.Format("2006-01-02T15:04:05Z07:00"), b.EndsAt.Format("2006-01-02T15:04:05Z07:00"),
+		nullIfEmpty(ptrString(b.OutlookEventID)),
 		b.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"), b.ID,
 	)
 	if err != nil {
@@ -148,25 +151,30 @@ func (s *Store) DeleteBlock(ctx context.Context, id string) error {
 }
 
 const blockSelect = `SELECT b.id, b.task_id, b.title, b.notes, b.starts_at, b.ends_at,
-		b.created_at, b.updated_at
+		b.outlook_event_id, b.created_at, b.updated_at
 	FROM blocks b`
 
 func scanBlock(scan scanFn) (*models.Block, error) {
 	var (
-		b         models.Block
-		taskID    sql.NullString
-		startsAt  string
-		endsAt    string
-		createdAt string
-		updatedAt string
+		b             models.Block
+		taskID        sql.NullString
+		outlookEvent  sql.NullString
+		startsAt      string
+		endsAt        string
+		createdAt     string
+		updatedAt     string
 	)
-	err := scan(&b.ID, &taskID, &b.Title, &b.Notes, &startsAt, &endsAt, &createdAt, &updatedAt)
+	err := scan(&b.ID, &taskID, &b.Title, &b.Notes, &startsAt, &endsAt, &outlookEvent, &createdAt, &updatedAt)
 	if err != nil {
 		return nil, err
 	}
 	if taskID.Valid {
 		v := taskID.String
 		b.TaskID = &v
+	}
+	if outlookEvent.Valid && outlookEvent.String != "" {
+		v := outlookEvent.String
+		b.OutlookEventID = &v
 	}
 	b.StartsAt = parseTimeOrZero(startsAt)
 	b.EndsAt = parseTimeOrZero(endsAt)

@@ -13,10 +13,11 @@ import (
 // CreateProject inserts a new project.
 func (s *Store) CreateProject(ctx context.Context, p *models.Project) error {
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO projects (id, name, description, status, color, initiative_id, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO projects (id, name, description, status, color, initiative_id, github_repo, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		p.ID, p.Name, p.Description, p.Status, p.Color,
-		nullIfEmpty(ptrString(p.InitiativeID)), p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		nullIfEmpty(ptrString(p.InitiativeID)), nullIfEmpty(ptrString(p.GitHubRepo)),
+		p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	)
 	if err != nil {
 		return fmt.Errorf("create project: %w", err)
@@ -114,10 +115,11 @@ func (s *Store) UpdateProject(ctx context.Context, p *models.Project) error {
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE projects SET
 			name = ?, description = ?, status = ?, color = ?,
-			initiative_id = ?, updated_at = ?
+			initiative_id = ?, github_repo = ?, updated_at = ?
 		WHERE id = ?`,
 		p.Name, p.Description, p.Status, p.Color,
-		nullIfEmpty(ptrString(p.InitiativeID)), p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"), p.ID,
+		nullIfEmpty(ptrString(p.InitiativeID)), nullIfEmpty(ptrString(p.GitHubRepo)),
+		p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"), p.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update project: %w", err)
@@ -135,24 +137,29 @@ func (s *Store) DeleteProject(ctx context.Context, id string) error {
 }
 
 const projectSelect = `SELECT p.id, p.name, p.description, p.status, p.color,
-		p.initiative_id, p.created_at, p.updated_at
+		p.initiative_id, p.github_repo, p.created_at, p.updated_at
 	FROM projects p`
 
 func scanProject(scan scanFn) (*models.Project, error) {
 	var (
 		p            models.Project
 		initiativeID sql.NullString
+		githubRepo   sql.NullString
 		createdAt    string
 		updatedAt    string
 	)
 	err := scan(&p.ID, &p.Name, &p.Description, &p.Status, &p.Color,
-		&initiativeID, &createdAt, &updatedAt)
+		&initiativeID, &githubRepo, &createdAt, &updatedAt)
 	if err != nil {
 		return nil, err
 	}
 	if initiativeID.Valid {
 		v := initiativeID.String
 		p.InitiativeID = &v
+	}
+	if githubRepo.Valid && githubRepo.String != "" {
+		v := githubRepo.String
+		p.GitHubRepo = &v
 	}
 	p.CreatedAt = parseTimeOrZero(createdAt)
 	p.UpdatedAt = parseTimeOrZero(updatedAt)

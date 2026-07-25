@@ -34,11 +34,13 @@ type TaskQuery struct {
 func (s *Store) CreateTask(ctx context.Context, t *models.Task) error {
 	tags := strings.Join(t.Tags, ",")
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO tasks (id, title, notes, status, priority, project_id, initiative_id, tags, due_at, created_at, updated_at, completed_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO tasks (id, title, notes, status, priority, project_id, initiative_id, tags, due_at, github_repo, github_issue_number, created_at, updated_at, completed_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		t.ID, t.Title, t.Notes, string(t.Status), string(t.Priority),
 		nullIfEmpty(ptrString(t.ProjectID)), nullIfEmpty(ptrString(t.InitiativeID)),
-		tags, timeStr(t.DueAt), timeStrNonZero(t.CreatedAt), timeStrNonZero(t.UpdatedAt), timeStr(t.CompletedAt),
+		tags, timeStr(t.DueAt),
+		nullIfEmpty(ptrString(t.GitHubRepo)), nullInt(t.GitHubIssue),
+		timeStrNonZero(t.CreatedAt), timeStrNonZero(t.UpdatedAt), timeStr(t.CompletedAt),
 	)
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
@@ -157,11 +159,14 @@ func (s *Store) UpdateTask(ctx context.Context, t *models.Task) error {
 		UPDATE tasks SET
 			title = ?, notes = ?, status = ?, priority = ?,
 			project_id = ?, initiative_id = ?, tags = ?,
-			due_at = ?, updated_at = ?, completed_at = ?
+			due_at = ?, github_repo = ?, github_issue_number = ?,
+			updated_at = ?, completed_at = ?
 		WHERE id = ?`,
 		t.Title, t.Notes, string(t.Status), string(t.Priority),
 		nullIfEmpty(ptrString(t.ProjectID)), nullIfEmpty(ptrString(t.InitiativeID)),
-		tags, timeStr(t.DueAt), t.UpdatedAt.Format(time.RFC3339), timeStr(t.CompletedAt), t.ID,
+		tags, timeStr(t.DueAt),
+		nullIfEmpty(ptrString(t.GitHubRepo)), nullInt(t.GitHubIssue),
+		t.UpdatedAt.Format(time.RFC3339), timeStr(t.CompletedAt), t.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update task: %w", err)
@@ -202,6 +207,7 @@ func (s *Store) CountTasks(ctx context.Context, f TaskFilter) (int, error) {
 
 const taskSelect = `SELECT t.id, t.title, t.notes, t.status, t.priority,
 		t.project_id, t.initiative_id, t.tags, t.due_at,
+		t.github_repo, t.github_issue_number,
 		t.created_at, t.updated_at, t.completed_at
 	FROM tasks t`
 
@@ -214,6 +220,8 @@ func scanTask(scan scanFn) (*models.Task, error) {
 		initiativeID sql.NullString
 		tags        sql.NullString
 		dueAt       sql.NullString
+		githubRepo  sql.NullString
+		githubIssue sql.NullInt64
 		completedAt sql.NullString
 		createdAt   string
 		updatedAt   string
@@ -222,6 +230,7 @@ func scanTask(scan scanFn) (*models.Task, error) {
 	)
 	err := scan(&t.ID, &t.Title, &t.Notes, &status, &priority,
 		&projectID, &initiativeID, &tags, &dueAt,
+		&githubRepo, &githubIssue,
 		&createdAt, &updatedAt, &completedAt)
 	if err != nil {
 		return nil, err
@@ -245,6 +254,14 @@ func scanTask(scan scanFn) (*models.Task, error) {
 	}
 	if dueAt.Valid {
 		t.DueAt = parseTime(dueAt.String)
+	}
+	if githubRepo.Valid && githubRepo.String != "" {
+		v := githubRepo.String
+		t.GitHubRepo = &v
+	}
+	if githubIssue.Valid {
+		v := int(githubIssue.Int64)
+		t.GitHubIssue = &v
 	}
 	t.CreatedAt = parseTimeOrZero(createdAt)
 	t.UpdatedAt = parseTimeOrZero(updatedAt)

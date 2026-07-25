@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS projects (
     status       TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'on_hold', 'done', 'archived')),
     color        TEXT NOT NULL DEFAULT '',
     initiative_id TEXT,
+    github_repo  TEXT,
     created_at   TEXT NOT NULL,
     updated_at   TEXT NOT NULL,
     FOREIGN KEY (initiative_id) REFERENCES initiatives(id) ON DELETE SET NULL
@@ -46,6 +47,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     initiative_id TEXT,
     tags         TEXT NOT NULL DEFAULT '',  -- comma-separated
     due_at       TEXT,
+    github_repo  TEXT,
+    github_issue_number INTEGER,
     created_at   TEXT NOT NULL,
     updated_at   TEXT NOT NULL,
     completed_at TEXT,
@@ -59,14 +62,15 @@ CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
 CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_at);
 
 CREATE TABLE IF NOT EXISTS blocks (
-    id         TEXT PRIMARY KEY,
-    task_id    TEXT,
-    title      TEXT NOT NULL,
-    notes      TEXT NOT NULL DEFAULT '',
-    starts_at  TEXT NOT NULL,
-    ends_at    TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
+    id               TEXT PRIMARY KEY,
+    task_id          TEXT,
+    title            TEXT NOT NULL,
+    notes            TEXT NOT NULL DEFAULT '',
+    starts_at        TEXT NOT NULL,
+    ends_at          TEXT NOT NULL,
+    outlook_event_id TEXT,
+    created_at       TEXT NOT NULL,
+    updated_at       TEXT NOT NULL,
     FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_blocks_task ON blocks(task_id);

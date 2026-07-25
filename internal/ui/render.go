@@ -71,13 +71,14 @@ func PriorityLabel(p models.Priority) string {
 
 // TaskRow renders a single task as a one-line row.
 type TaskRow struct {
-	ID       string
-	Priority models.Priority
-	Status   models.TaskStatus
-	Title    string
-	Tags     []string
-	DueAt    *time.Time
-	Project  string // resolved project name, optional
+	ID         string
+	Priority   models.Priority
+	Status     models.TaskStatus
+	Title      string
+	Tags       []string
+	DueAt      *time.Time
+	Project    string // resolved project name, optional
+	GitHubIssue *int  // when set, a #N badge is shown
 }
 
 // RenderTaskTable renders rows for the given tasks.
@@ -101,6 +102,10 @@ func RenderTaskTable(rows []TaskRow) string {
 		if r.Priority != models.PriorityMedium {
 			// Medium is the default; hide it to reduce noise. Show others.
 			parts = append(parts, priorityStyle(r.Priority).Render(PriorityLabel(r.Priority)))
+		}
+		if r.GitHubIssue != nil {
+			// GitHub issue/PR badge, distinct from the project '#' marker.
+			parts = append(parts, lipgloss.NewStyle().Foreground(lipgloss.Color("63")).Render(fmt.Sprintf("GH#%d", *r.GitHubIssue)))
 		}
 		if r.Project != "" {
 			parts = append(parts, dim.Render("#"+r.Project))
@@ -215,7 +220,13 @@ func Section(name string) string {
 	return titleStyle.Render(name)
 }
 
-// Bold and Dim are exposed for command output.
+// Bold, Dim, Green, and Header are exposed for command output.
 func Bold(s string) string  { return bold.Render(s) }
 func Dim(s string) string    { return dim.Render(s) }
 func Header(s string) string { return header.Render(s) }
+
+// greenStyle renders text green; used for "open"/success states.
+var greenStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+
+// Green renders s in green.
+func Green(s string) string { return greenStyle.Render(s) }

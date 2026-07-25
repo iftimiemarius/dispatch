@@ -50,6 +50,8 @@ type Task struct {
 	InitiativeID *string   `json:"initiative_id,omitempty"`
 	Tags         []string  `json:"tags,omitempty"`
 	DueAt        *time.Time `json:"due_at,omitempty"`
+	GitHubRepo   *string   `json:"github_repo,omitempty"`
+	GitHubIssue  *int      `json:"github_issue_number,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 	CompletedAt  *time.Time `json:"completed_at,omitempty"`
@@ -63,6 +65,7 @@ type Project struct {
 	Status      string     `json:"status"`
 	Color       string     `json:"color,omitempty"`
 	InitiativeID *string   `json:"initiative_id,omitempty"`
+	GitHubRepo  *string    `json:"github_repo,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 }
@@ -81,12 +84,13 @@ type Initiative struct {
 
 // Block is a time reservation on the calendar for a task.
 type Block struct {
-	ID        string     `json:"id"`
-	TaskID    *string    `json:"task_id,omitempty"`
-	Title     string     `json:"title"`
-	Notes     string     `json:"notes"`
-	StartsAt  time.Time  `json:"starts_at"`
-	EndsAt    time.Time  `json:"ends_at"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	ID             string     `json:"id"`
+	TaskID         *string    `json:"task_id,omitempty"`
+	Title          string     `json:"title"`
+	Notes          string     `json:"notes"`
+	StartsAt       time.Time  `json:"starts_at"`
+	EndsAt         time.Time  `json:"ends_at"`
+	OutlookEventID *string    `json:"outlook_event_id,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }

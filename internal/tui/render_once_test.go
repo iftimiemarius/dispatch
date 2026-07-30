@@ -180,3 +180,29 @@ func TestRenderDetail_Task(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderMovePicker(t *testing.T) {
+	dir := t.TempDir()
+	st, _ := store.Open(filepath.Join(dir, "t.db"))
+	defer st.Close()
+	ctx := context.Background()
+	now := time.Now()
+	mustCreate(t, st.CreateProject(ctx, &models.Project{ID: "P1", Name: "api", Status: "active", CreatedAt: now, UpdatedAt: now}))
+	mustCreate(t, st.CreateProject(ctx, &models.Project{ID: "P2", Name: "docs", Status: "active", CreatedAt: now, UpdatedAt: now}))
+	mustCreate(t, st.CreateTask(ctx, &models.Task{ID: "T1", Title: "fix bug", Status: models.StatusTodo, Priority: models.PriorityHigh, CreatedAt: now, UpdatedAt: now}))
+	a := newApp(ctx, st)
+	a.active = viewTasks
+	ma, _ := a.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	a = ma.(*app)
+	// Press 'm' to open move picker.
+	a.handleAction(testKeyEvent("m"))
+	if a.mode != modeMove || a.move == nil {
+		t.Fatalf("move picker not opened: mode=%v", a.mode)
+	}
+	out := a.View()
+	for _, want := range []string{"Move task to project", "Inbox", "api", "docs", "navigate"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("move picker missing %q\n---\n%s", want, out)
+		}
+	}
+}

@@ -54,6 +54,7 @@ const (
 	modeForm
 	modeConfirm
 	modeDetail
+	modeMove
 )
 
 // app is the root Bubble Tea model.
@@ -62,9 +63,10 @@ type app struct {
 	store  *store.Store
 	active view
 	mode   mode
-	form   *formState     // non-nil in modeForm
-	confirm *confirmState // non-nil in modeConfirm
-	detail *detailState   // non-nil in modeDetail
+	form    *formState     // non-nil in modeForm
+	confirm *confirmState  // non-nil in modeConfirm
+	detail  *detailState   // non-nil in modeDetail
+	move    *moveState     // non-nil in modeMove
 
 	width, height int
 
@@ -125,7 +127,9 @@ func (a *app) newList(title string) list.Model {
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(true)
 	l.SetShowHelp(false)
-	l.Styles.Title = t.bold.Padding(0, 1)
+	// The tab bar already names each view, so hide the list's own title row
+	// to avoid a duplicate label directly beneath the tabs.
+	l.SetShowTitle(false)
 	return l
 }
 
@@ -172,6 +176,10 @@ func (a *app) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Detail mode handles its own keys.
 	if a.mode == modeDetail && a.detail != nil {
 		return a.detailUpdate(msg)
+	}
+	// Move mode handles project-picker navigation.
+	if a.mode == modeMove && a.move != nil {
+		return a.moveUpdate(msg)
 	}
 
 	switch {
@@ -229,6 +237,11 @@ func (a *app) View() string {
 	// Detail mode replaces the list body with the full-item view.
 	if a.mode == modeDetail && a.detail != nil {
 		b.WriteString(a.renderDetail())
+		return b.String()
+	}
+	// Move mode shows a project picker overlay.
+	if a.mode == modeMove && a.move != nil {
+		b.WriteString(a.renderMove())
 		return b.String()
 	}
 	// Confirm mode overlays on top of the (dimmed) list body.

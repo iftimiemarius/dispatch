@@ -22,6 +22,8 @@ func (a *app) handleAction(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		return a.actTaskStatus(it, models.StatusDoing, "in-progress")
 	case key.Matches(msg, km.Sync) && hasSel && it.kind == "block":
 		return a.actSyncBlock(it)
+	case key.Matches(msg, km.Move) && hasSel && it.kind == "task":
+		return a.actMoveTask(it)
 	case key.Matches(msg, km.Delete) && hasSel:
 		return a.actDelete(it)
 	case key.Matches(msg, km.New):

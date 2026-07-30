@@ -198,21 +198,29 @@ func (a *app) formUpdate(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "shift+tab":
 		f.prevField()
 		return a, nil
-	case "up":
+	case "up", "k":
+		f.prevField()
+		return a, nil
+	case "down", "j":
+		f.nextField()
+		return a, nil
+	case "left", "h":
+		// On enum fields, cycle the selection left; on text fields, fall
+		// through so the textinput handles cursor movement.
 		cur := f.fields[f.focus]
 		if !cur.isText && cur.cycler != nil {
 			cur.cycler.prev()
+			return a, nil
 		}
-		return a, nil
-	case "down":
+	case "right", "l":
 		cur := f.fields[f.focus]
 		if !cur.isText && cur.cycler != nil {
 			cur.cycler.next()
+			return a, nil
 		}
-		return a, nil
 	}
 
-	// Forward typing to the focused text input.
+	// Forward typing (and left/right on text fields) to the focused input.
 	cur := f.fields[f.focus]
 	if cur.isText && cur.input != nil {
 		m, cmd := cur.input.Update(msg)
@@ -415,19 +423,21 @@ func (a *app) renderForm() string {
 		if fl.isText {
 			val = fl.input.View()
 		} else {
+			// Prefix with the same ">" prompt text inputs show, so every field
+			// has a uniform cursor affordance regardless of focus.
 			opts := make([]string, len(fl.cycler.options))
-			for i, o := range fl.cycler.options {
-				if i == fl.cycler.current {
-					opts[i] = t.accent.Render("["+o+"]")
+			for j, o := range fl.cycler.options {
+				if j == fl.cycler.current {
+					opts[j] = t.accent.Render("["+o+"]")
 				} else {
-					opts[i] = t.dim.Render(o)
+					opts[j] = t.dim.Render(o)
 				}
 			}
-			val = strings.Join(opts, " ")
+			val = "> " + strings.Join(opts, " ")
 		}
 		b.WriteString(fmt.Sprintf("%s %s %s\n", cursor, t.label.Render(fl.label+":"), val))
 	}
-	b.WriteString("\n" + t.hint.Render("Tab next • ↑↓ cycle • Enter save • Esc cancel"))
+	b.WriteString("\n" + t.hint.Render("↑↓ move field • ←→ cycle • Tab next • Enter save • Esc cancel"))
 	if f.errMsg != "" {
 		b.WriteString("\n" + t.urgent.Render("  ⚠ "+f.errMsg))
 	}

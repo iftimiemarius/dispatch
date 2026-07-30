@@ -32,11 +32,11 @@ var km = keymap{
 	ForceQuit: key.NewBinding(key.WithKeys("ctrl+c")),
 	Help:      key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 
-	NextTab: key.NewBinding(key.WithKeys("tab", "L", "l"), key.WithHelp("L", "next tab")),
-	PrevTab: key.NewBinding(key.WithKeys("shift+tab", "H", "h"), key.WithHelp("H", "prev tab")),
+	NextTab: key.NewBinding(key.WithKeys("tab", "right", "L", "l"), key.WithHelp("→/L", "next tab")),
+	PrevTab: key.NewBinding(key.WithKeys("shift+tab", "left", "H", "h"), key.WithHelp("←/H", "prev tab")),
 
-	Up:         key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("k", "up")),
-	Down:       key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("j", "down")),
+	Up:         key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "prev field")),
+	Down:       key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "next field")),
 	Filter:     key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
 	ClearFilter: key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "clear")),
 

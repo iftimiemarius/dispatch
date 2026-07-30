@@ -58,7 +58,7 @@ func newTheme() theme {
 		low:     lipgloss.NewStyle().Foreground(lipgloss.Color("245")),
 		accent:  lipgloss.NewStyle().Foreground(lipgloss.Color("63")),
 
-		label: lipgloss.NewStyle().Bold(true).Width(10),
+		label: lipgloss.NewStyle().Bold(true).Width(14),
 		field: lipgloss.NewStyle().Foreground(lipgloss.Color("39")),
 		hint:  lipgloss.NewStyle().Faint(true),
 	}

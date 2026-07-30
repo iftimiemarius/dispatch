@@ -435,6 +435,15 @@ func (a *app) renderForm() string {
 		verb = "Edit"
 	}
 	b.WriteString(t.bold.Render(fmt.Sprintf("%s %s", verb, f.kind)) + "\n\n")
+	// Size the label column to the longest label (+2 for the colon and a gap)
+	// so labels never wrap and values always start in a clean column.
+	labelW := 0
+	for _, fl := range f.fields {
+		if l := len(fl.label) + 1; l > labelW {
+			labelW = l
+		}
+	}
+	labelStyle := t.label.Width(labelW)
 	for i, fl := range f.fields {
 		cursor := " "
 		if i == f.focus {
@@ -456,7 +465,7 @@ func (a *app) renderForm() string {
 			}
 			val = "> " + strings.Join(opts, " ")
 		}
-		b.WriteString(fmt.Sprintf("%s %s %s\n", cursor, t.label.Render(fl.label+":"), val))
+		b.WriteString(fmt.Sprintf("%s %s %s\n", cursor, labelStyle.Render(fl.label+":"), val))
 	}
 	b.WriteString("\n" + t.hint.Render("↑↓ move field • ←→ cycle • Tab next • Enter save • Esc cancel"))
 	if f.errMsg != "" {

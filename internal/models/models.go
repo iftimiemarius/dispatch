@@ -91,6 +91,7 @@ type Block struct {
 	StartsAt       time.Time  `json:"starts_at"`
 	EndsAt         time.Time  `json:"ends_at"`
 	OutlookEventID *string    `json:"outlook_event_id,omitempty"`
+	AutoSync       bool       `json:"auto_sync"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
 }

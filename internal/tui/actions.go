@@ -75,6 +75,10 @@ func (a *app) actDelete(it item) (tea.Model, tea.Cmd, bool) {
 			case "initiative":
 				_ = a.store.DeleteInitiative(a.ctx, it.id)
 			case "block":
+				// Clean up the linked Outlook event before removing the block.
+				if blk, err := a.store.GetBlock(a.ctx, it.id); err == nil {
+					_ = unsyncBlockFromOutlook(a.ctx, blk)
+				}
 				_ = a.store.DeleteBlock(a.ctx, it.id)
 			}
 			a.statusMsg = "deleted"

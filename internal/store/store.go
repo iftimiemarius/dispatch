@@ -21,15 +21,19 @@ var schemaSQL string
 //go:embed migrations/002_github_outlook.sql
 var migration002 string
 
+//go:embed migrations/003_block_autosync.sql
+var migration003 string
+
 // currentSchemaVersion is bumped whenever a new migration is added; the runner
 // applies every migration up to this number. Migration 1 is the baseline
 // schema.sql (applied via CREATE TABLE IF NOT EXISTS for fresh installs).
-const currentSchemaVersion = 2
+const currentSchemaVersion = 3
 
 // migrations maps a version number to its SQL, applied in ascending order.
 // Migration 1 is intentionally absent here — it's the baseline schema.sql.
 var migrations = map[int]string{
 	2: migration002,
+	3: migration003,
 }
 
 // Store wraps a SQLite database connection.
@@ -231,4 +235,12 @@ func nullInt(p *int) any {
 		return nil
 	}
 	return *p
+}
+
+// boolToInt converts a bool to the SQLite integer representation (1/0).
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

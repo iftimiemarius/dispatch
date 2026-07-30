@@ -148,14 +148,19 @@ func (f *formState) buildBlockFields() {
 		b = f.editing.(*models.Block)
 	}
 	title, from, dur := "", "", "30m"
+	autoSync := "yes"
 	if b != nil {
 		title = b.Title
 		from = b.StartsAt.Format("15:04")
 		dur = fmt.Sprintf("%dm", int(b.EndsAt.Sub(b.StartsAt).Minutes()))
+		if !b.AutoSync {
+			autoSync = "no"
+		}
 	}
 	f.addText("Title", title, "focus block")
 	f.addText("From", from, "e.g. 9am or 14:30")
 	f.addText("Duration", dur, "e.g. 30m, 2h")
+	f.addEnum("Sync to Outlook", []string{"yes", "no"}, autoSync)
 }
 
 // --- key handling ---
@@ -392,12 +397,28 @@ func (a *app) saveBlock(f *formState, now time.Time) (tea.Model, tea.Cmd) {
 	b.Title = f.fieldValue("Title")
 	b.StartsAt = start
 	b.EndsAt = start.Add(dur)
+	b.AutoSync = f.fieldValue("Sync to Outlook") == "yes"
 	b.UpdatedAt = now
 	if err := a.store.CreateOrUpdateBlock(a.ctx, b); err != nil {
 		f.errMsg = err.Error()
 		return a, nil
 	}
-	a.statusMsg = "saved"
+	// Auto-sync: if enabled and Outlook is connected, push the block now.
+	if b.AutoSync {
+		if id, err := syncBlockToOutlook(a.ctx, b); err == nil {
+			b.OutlookEventID = &id
+			b.UpdatedAt = now
+			_ = a.store.UpdateBlock(a.ctx, b)
+			a.statusMsg = "saved • synced to outlook"
+		} else if !isOutlookNotConfigured(err) {
+			// Connected but failed — surface the error; keep the local block.
+			a.statusMsg = "saved • outlook sync failed: " + err.Error()
+		} else {
+			a.statusMsg = "saved"
+		}
+	} else {
+		a.statusMsg = "saved"
+	}
 	a.afterSave()
 	return a, nil
 }

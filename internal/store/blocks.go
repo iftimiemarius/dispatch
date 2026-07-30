@@ -14,11 +14,12 @@ import (
 // CreateBlock inserts a new calendar block.
 func (s *Store) CreateBlock(ctx context.Context, b *models.Block) error {
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO blocks (id, task_id, title, notes, starts_at, ends_at, outlook_event_id, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO blocks (id, task_id, title, notes, starts_at, ends_at, outlook_event_id, auto_sync, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		b.ID, nullIfEmpty(ptrString(b.TaskID)), b.Title, b.Notes,
 		b.StartsAt.Format("2006-01-02T15:04:05Z07:00"), b.EndsAt.Format("2006-01-02T15:04:05Z07:00"),
 		nullIfEmpty(ptrString(b.OutlookEventID)),
+		boolToInt(b.AutoSync),
 		b.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), b.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	)
 	if err != nil {
@@ -128,11 +129,12 @@ func (s *Store) UpdateBlock(ctx context.Context, b *models.Block) error {
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE blocks SET
 			task_id = ?, title = ?, notes = ?, starts_at = ?, ends_at = ?,
-			outlook_event_id = ?, updated_at = ?
+			outlook_event_id = ?, auto_sync = ?, updated_at = ?
 		WHERE id = ?`,
 		nullIfEmpty(ptrString(b.TaskID)), b.Title, b.Notes,
 		b.StartsAt.Format("2006-01-02T15:04:05Z07:00"), b.EndsAt.Format("2006-01-02T15:04:05Z07:00"),
 		nullIfEmpty(ptrString(b.OutlookEventID)),
+		boolToInt(b.AutoSync),
 		b.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"), b.ID,
 	)
 	if err != nil {
@@ -151,7 +153,7 @@ func (s *Store) DeleteBlock(ctx context.Context, id string) error {
 }
 
 const blockSelect = `SELECT b.id, b.task_id, b.title, b.notes, b.starts_at, b.ends_at,
-		b.outlook_event_id, b.created_at, b.updated_at
+		b.outlook_event_id, b.auto_sync, b.created_at, b.updated_at
 	FROM blocks b`
 
 func scanBlock(scan scanFn) (*models.Block, error) {
@@ -159,12 +161,13 @@ func scanBlock(scan scanFn) (*models.Block, error) {
 		b             models.Block
 		taskID        sql.NullString
 		outlookEvent  sql.NullString
+		autoSync      int
 		startsAt      string
 		endsAt        string
 		createdAt     string
 		updatedAt     string
 	)
-	err := scan(&b.ID, &taskID, &b.Title, &b.Notes, &startsAt, &endsAt, &outlookEvent, &createdAt, &updatedAt)
+	err := scan(&b.ID, &taskID, &b.Title, &b.Notes, &startsAt, &endsAt, &outlookEvent, &autoSync, &createdAt, &updatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -176,6 +179,7 @@ func scanBlock(scan scanFn) (*models.Block, error) {
 		v := outlookEvent.String
 		b.OutlookEventID = &v
 	}
+	b.AutoSync = autoSync != 0
 	b.StartsAt = parseTimeOrZero(startsAt)
 	b.EndsAt = parseTimeOrZero(endsAt)
 	b.CreatedAt = parseTimeOrZero(createdAt)

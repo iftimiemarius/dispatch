@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS blocks (
     starts_at        TEXT NOT NULL,
     ends_at          TEXT NOT NULL,
     outlook_event_id TEXT,
+    auto_sync        INTEGER NOT NULL DEFAULT 1,
     created_at       TEXT NOT NULL,
     updated_at       TEXT NOT NULL,
     FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL

@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/iftimiemarius/dispatch/internal/calendar"
+	"github.com/iftimiemarius/dispatch/internal/config"
+	"github.com/iftimiemarius/dispatch/internal/graph"
 	"github.com/iftimiemarius/dispatch/internal/models"
 	"github.com/iftimiemarius/dispatch/internal/store"
 	"github.com/iftimiemarius/dispatch/internal/timeparse"
@@ -40,6 +42,7 @@ func newBlockAddCmd() *cobra.Command {
 		dur    string
 		title  string
 		notes  string
+		noSync bool
 	)
 	cmd := &cobra.Command{
 		Use:   "add [title]",
@@ -104,6 +107,7 @@ be given with --day (default: today). Examples:
 				Notes:     notes,
 				StartsAt:  start,
 				EndsAt:    end,
+				AutoSync:  !noSync, // default true; --no-sync disables
 				CreatedAt: now.UTC(),
 				UpdatedAt: now.UTC(),
 			}
@@ -123,6 +127,10 @@ be given with --day (default: today). Examples:
 				ui.Dim(b.ID),
 				relativeDay(start), start.Format("15:04"), end.Format("15:04"),
 				title)
+			// Auto-sync: push to Outlook if enabled and connected.
+			if b.AutoSync {
+				_ = trySyncBlock(ctx, b, st, cmd)
+			}
 			return nil
 		},
 	}
@@ -133,6 +141,7 @@ be given with --day (default: today). Examples:
 	cmd.Flags().StringVar(&dur, "duration", "", "block length, e.g. 2h, 90m")
 	cmd.Flags().StringVarP(&title, "title", "T", "", "block title (overrides positional)")
 	cmd.Flags().StringVarP(&notes, "notes", "n", "", "notes")
+	cmd.Flags().BoolVar(&noSync, "no-sync", false, "don't auto-sync this block to Outlook")
 	return cmd
 }
 
@@ -145,6 +154,58 @@ func joinArgs(args []string) string {
 		out += a
 	}
 	return out
+}
+
+// trySyncBlock pushes a block to Outlook if configured/connected, storing the
+// resulting event id. It's best-effort: missing config/auth is silent; a real
+// failure prints a warning but doesn't fail the command (the local block is
+// already saved).
+func trySyncBlock(ctx context.Context, b *models.Block, st *store.Store, cmd *cobra.Command) error {
+	paths := MustPaths(cmd)
+	cfg, err := config.Load(paths.ConfigFile)
+	if err != nil || !cfg.OutlookEnabled() {
+		return nil // not configured — silent
+	}
+	auth := graph.NewAuthenticator(cfg.Outlook.ClientID, cfg.Outlook.Tenant, cfg.Outlook.RedirectPort)
+	gc, err := graph.NewClientFromAuthenticator(ctx, auth)
+	if err != nil {
+		return nil // not authenticated — silent
+	}
+	id, err := gc.CreateEvent(ctx, graph.EventFromBlock(graph.BlockLike{
+		Title: b.Title, Notes: b.Notes, TaskID: b.TaskID, StartsAt: b.StartsAt, EndsAt: b.EndsAt,
+	}, ""))
+	if err != nil {
+		fmt.Fprintf(cmd.ErrOrStderr(), "  outlook sync failed: %v\n", err)
+		return err
+	}
+	b.OutlookEventID = &id
+	b.UpdatedAt = time.Now().UTC()
+	_ = st.UpdateBlock(ctx, b)
+	fmt.Fprintf(cmd.OutOrStdout(), "  %s synced to outlook\n", ui.Dim(b.ID))
+	return nil
+}
+
+// tryUnsyncBlock deletes a block's Outlook event before the block is removed.
+// Best-effort: silent when not configured/authed or when the block has no link.
+func tryUnsyncBlock(ctx context.Context, b *models.Block, cmd *cobra.Command) {
+	if b.OutlookEventID == nil || *b.OutlookEventID == "" {
+		return
+	}
+	paths := MustPaths(cmd)
+	cfg, err := config.Load(paths.ConfigFile)
+	if err != nil || !cfg.OutlookEnabled() {
+		return
+	}
+	auth := graph.NewAuthenticator(cfg.Outlook.ClientID, cfg.Outlook.Tenant, cfg.Outlook.RedirectPort)
+	gc, err := graph.NewClientFromAuthenticator(ctx, auth)
+	if err != nil {
+		return
+	}
+	if err := gc.DeleteEvent(ctx, *b.OutlookEventID); err != nil {
+		fmt.Fprintf(cmd.ErrOrStderr(), "  outlook unsync failed: %v\n", err)
+		return
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "  %s removed from outlook\n", ui.Dim(b.ID))
 }
 
 // resolveBlockTime combines a day token (optional) and a clock token into an
@@ -219,6 +280,8 @@ func newBlockRmCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// Clean up the linked Outlook event before removing the block.
+			tryUnsyncBlock(ctx, b, cmd)
 			if err := st.DeleteBlock(ctx, b.ID); err != nil {
 				return err
 			}

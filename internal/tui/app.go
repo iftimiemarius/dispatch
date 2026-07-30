@@ -276,8 +276,14 @@ func (a *app) renderTabs() string {
 
 // renderStatus shows the transient status message (if any).
 func (a *app) renderStatus() string {
+	// Reserve a couple of columns of padding so a long message never wraps and
+	// breaks the single-line status bar layout.
+	maxW := a.width - 2
+	if maxW < 10 {
+		maxW = 10
+	}
 	if a.statusMsg != "" {
-		return t.statusBar.Render(a.statusMsg)
+		return t.statusBar.Render(truncate(a.statusMsg, maxW))
 	}
 	cur := a.curList()
 	if cur != nil {
@@ -285,6 +291,21 @@ func (a *app) renderStatus() string {
 		return t.statusBar.Render(fmt.Sprintf("%d items", count))
 	}
 	return ""
+}
+
+// truncate shortens s to max runes, appending an ellipsis if it was cut.
+func truncate(s string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	if max <= 1 {
+		return "…"
+	}
+	return string(runes[:max-1]) + "…"
 }
 
 // renderHelp shows the one-line key hint.
